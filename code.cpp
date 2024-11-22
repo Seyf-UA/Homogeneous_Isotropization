@@ -313,11 +313,7 @@ public:
     
 
 private: 
-    //int num_eq;
-    //vector<vector<vector<double>>>&  data  ;
     SetGrid& grid_inst;
-    //double& ksi;
-    //double& a4;
     Eigen::MatrixXd Eigen_coeff_matrix;
     Eigen::VectorXd Eigen_source;
     Eigen::VectorXd Eigen_sol;
@@ -440,7 +436,7 @@ private:
     }
 
     //function to calculate the cardinal functions for the chebyshev expansion for [-1,1]. 
-    double cardinal_fct_oneToMinusOne(size_t j, double y) {//j is for the order of the cardinal fct
+    double cardinal_fct_oneToMinusOne(size_t j, double y) {
         vector<double> z = grid_inst.z;
 
         if (y == z[j - 1]) return 1.0;
@@ -451,7 +447,7 @@ private:
 
 
     //function to calculate the  cardinal functions for the chebyshev expansion for [0,1].
-    double cardinal_fct(size_t j, double y) {//j is for the order of the cardinal fct
+    double cardinal_fct(size_t j, double y) {
         return cardinal_fct_oneToMinusOne(j, 2.0 * y - 1.0);
     }
 
@@ -565,7 +561,15 @@ private:
 
 };
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+class radial_shift {
 
+public:
+    void run(double& uh, double desired_uh, double& ksi) {
+        ksi += -(1.0 / (desired_uh)) + (1.0 / uh);
+    }
+};
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -605,7 +609,7 @@ public:
 
 
     Wilke_Routine(SetGrid& grid, double&t_0, double& t_f, double& dt, vector<vector<vector<double>>>& vals, double& ksi, double& a4, 
-        solve& solver, find_horizon& horizon_finder, double& uh): tt(t_0), interp(grid), orderInterp(5), 
+        solve& solver, find_horizon& horizon_finder, double& uh, double& uh_initial): tt(t_0), interp(grid), orderInterp(5),
         number_slices(static_cast<int>(std::ceil((t_f - t_0) / dt))), tolerance(1e-7), max_iterations(2000), last_dtBs(grid.size) {
 
         //create table dts
@@ -626,6 +630,13 @@ public:
         std::cout << "number of time slices is: " << number_slices << endl;
 
         for (size_t count = 1; count <= static_cast<size_t>(number_slices); ++count) {
+
+            if (count % 100 == 0) {
+                solver.run(2, vals, ksi, a4);
+                
+                uh = horizon_finder.run(vals, ksi, uh, tolerance, max_iterations);
+                shift.run(uh, uh_initial, ksi);
+            }
 
             solver.run(4, vals, ksi, a4);
             
@@ -654,7 +665,7 @@ public:
             dt_ksi_list.push_back(dt_ksi);
 
 
-            //continue here
+           
             last_dtBs[0] = 0.5 * (8.0 * vals[0][0][0] * ksi + 2.0 * vals[3][1][0]  + 5.0 * vals[0][1][0] );
             for (size_t j = 1; j < grid.size; ++j) {
                 last_dtBs[j] = (1.0 / (2.0 * grid.u[j])) * (2.0 * vals[3][0][j]  + (1.0 + pow(grid.u[j], 4) * vals[4][0][j]
@@ -768,6 +779,7 @@ public:
     
 
 private:
+    radial_shift shift;
 
     vector<double> multiplyMatrixVector(const vector<vector<double>>& matrix, const vector<double>& vec) {
 
@@ -839,7 +851,7 @@ private:
 
 int main() {
 
-    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_DEBUG);
+    
     auto start = std::chrono::high_resolution_clock::now();
 
     double ksi;
@@ -858,10 +870,7 @@ int main() {
 
 
     solve solver(grid);   
-
-    // Run the solver
-    
-        solver.run(2, vals, ksi, a4);
+    solver.run(2, vals, ksi, a4);
     
 
     //Now find horizon
@@ -872,7 +881,7 @@ int main() {
     find_horizon horizon_finder(grid);
     uh = horizon_finder.run(vals, ksi, uh, tolerance, max_iterations);
 
-
+    double uh_initial = uh;
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -881,7 +890,7 @@ int main() {
     double t_f = 3.0; // Final time
 
     
-    Wilke_Routine  num_routine(grid, t_0, t_f, dt, vals, ksi, a4, solver, horizon_finder, uh);
+    Wilke_Routine  num_routine(grid, t_0, t_f, dt, vals, ksi, a4, solver, horizon_finder, uh, uh_initial);
 
     auto end_numerics = std::chrono::high_resolution_clock::now();
 
@@ -927,6 +936,22 @@ int main() {
     
     //Print out results in seperate dat files
     print Print(vals, num_routine, grid, 17);
+
+
+
+
+    //print horiozn list, if you want
+    std::ofstream outFile("horizon list.dat");
+    if (!outFile) {
+        throw std::runtime_error("Unable to open horizon list.dat for writing!");
+    }
+    //set precision
+    outFile << std::fixed << std::setprecision(17);
+
+    for (size_t i = 0; i < num_routine.timelist.size(); ++i) {
+        outFile << num_routine.timelist[i] << " " << num_routine.horizonlist[i] << endl;
+    }
+
 
 
     // Calculate the program execution time
