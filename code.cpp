@@ -22,7 +22,7 @@ public:
     vector<vector<double>> D;  //chebyshev_diff_matrix
     vector<vector<double>> D2;
     
-    SetGrid(size_t n) : size(n), z(n), u(n), D(n, vector<double>(n)), fact(0.5) {
+    SetGrid(size_t n) : size(n), z(n), u(n), D(n, vector<double>(n)) {
         
         //set u_grid
         for (size_t i = 0; i < static_cast<size_t>(n); ++i) {
@@ -30,7 +30,7 @@ public:
         }
 
         for (size_t i = 0; i < static_cast<size_t>(n); ++i) {
-            u[i] = z[i] * fact + fact;
+            u[i] = z[i] * 0.5 + 0.5;
         }
     
         std::reverse(u.begin(), u.end());
@@ -64,7 +64,7 @@ public:
         
         for (size_t i = 0; i < static_cast<size_t>(n); ++i) {
             for (size_t j = 0; j < static_cast<size_t>(n); ++j) {
-                D[i][j] *= (1.0 / fact);
+                D[i][j] *= 2.0;
             }
         }
 
@@ -85,7 +85,6 @@ public:
           
 
 private:
-        double fact;
         //function to compute the product of 2 matrices
         vector<vector<double>> multiplyMatrixMatrix(const vector<vector<double>>& mat1, const vector<vector<double>>& mat2) {
             size_t rows1 = mat1.size();
@@ -861,9 +860,9 @@ int main() {
     solve solver(grid);   
 
     // Run the solver
-    for (size_t m = 1; m <= 2; ++m) {
+    
         solver.run(2, vals, ksi, a4);
-    }
+    
 
     //Now find horizon
     double uh = 1.0;  
