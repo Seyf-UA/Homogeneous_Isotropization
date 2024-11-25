@@ -1,7 +1,10 @@
-#define _USE_MATH_DEFINES
+﻿#define _USE_MATH_DEFINES
 #include <iostream>
+#include <utility>  
+
 #include <iomanip> 
-#include <stdexcept>        
+#include <stdexcept>       
+
 #include <fstream>
 #include <chrono> 
 #include <string>
@@ -14,6 +17,22 @@ using namespace std;
 using namespace Eigen;
 
 
+
+vector<double> multiplyMatrixVector(const vector<vector<double>>& matrix, const vector<double>& vec) {
+
+    vector<double> result(matrix.size(), 0.0);
+
+    for (size_t i = 0; i < matrix.size(); ++i) {
+        for (size_t j = 0; j < vec.size(); ++j) {
+            result[i] += matrix[i][j] * vec[j];
+        }
+    }
+    return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
 class SetGrid {
 public: 
     size_t size;
@@ -22,7 +41,7 @@ public:
     vector<vector<double>> D;  //chebyshev_diff_matrix
     vector<vector<double>> D2;
     
-    SetGrid(size_t n) : size(n), z(n), u(n), D(n, vector<double>(n)) {
+    SetGrid(size_t n) : size(n), z(n), u(n), D(n, vector<double>(n)){
         
         //set u_grid
         for (size_t i = 0; i < static_cast<size_t>(n); ++i) {
@@ -61,10 +80,9 @@ public:
 
 
         // Scale the differentiation matrix for the interval [0, 1]
-        
         for (size_t i = 0; i < static_cast<size_t>(n); ++i) {
             for (size_t j = 0; j < static_cast<size_t>(n); ++j) {
-                D[i][j] *= 2.0;
+                D[i][j] *= 2;
             }
         }
 
@@ -85,6 +103,7 @@ public:
           
 
 private:
+        
         //function to compute the product of 2 matrices
         vector<vector<double>> multiplyMatrixMatrix(const vector<vector<double>>& mat1, const vector<vector<double>>& mat2) {
             size_t rows1 = mat1.size();
@@ -102,59 +121,6 @@ private:
             }
             return product;
         }
-};
-
-/////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
-class initialize {
-public:
-    initialize(SetGrid& grid, vector<vector<vector<double>>>& vals, double Beta, double Omega, double U0, double& ksi) :
-        beta(Beta), omega(Omega), u0(U0) {
-
-        ksi = 0.0;
-
-        //Bs[t,u] at the first time slice
-        vals[0][0][0] = Bs0(0);
-        for (size_t i = 1; i < grid.size; ++i) {
-            vals[0][0][i] = aux(ksi, grid.u[i]);
-        }
-
-        vals[0][1] = multiplyMatrixVector(grid.D, vals[0][0]);
-        vals[0][2] = multiplyMatrixVector(grid.D2, vals[0][0]);
-
-    }
-
-
-private:
-    double beta;
-    double omega;
-    double u0;
-
-
-    //define the function Bs at the first time slice
-    double Bs0(double uu) {
-        return beta * exp(-pow((uu - u0), 2) / (2.0 * pow(omega, 2)));
-    }
-
-
-    double aux(const double& ksi, double uu) {
-        return Bs0(uu / (1.0 - ksi * uu));
-    }
-
-
-    vector<double> multiplyMatrixVector(const vector<vector<double>>& matrix, const vector<double>& vec) {
-
-        vector<double> result(matrix.size(), 0.0);
-
-        for (size_t i = 0; i < matrix.size(); ++i) {
-            for (size_t j = 0; j < vec.size(); ++j) {
-                result[i] += matrix[i][j] * vec[j];
-            }
-        }
-        return result;
-    }
-
-
 };
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -264,14 +230,9 @@ public:
     
     }
 private:
-    //size_t eq_num;
-    //vector<vector<vector<double>>>& data;
-    //SetGrid& grid_inst;
     size_t N;
     vector<vector<double>> unit_matrix;
-    //double ksi;
-    //double a4;
-
+    
 };
 
 
@@ -283,8 +244,6 @@ class solve{
 public:
     coefficients coeff;
 
-    
-    
     solve(SetGrid& grid) : grid_inst(grid), coeff(grid) {}
 
     //solve the first num equations.
@@ -310,28 +269,12 @@ public:
     
         }
 
-    
-
 private: 
     SetGrid& grid_inst;
     Eigen::MatrixXd Eigen_coeff_matrix;
     Eigen::VectorXd Eigen_source;
     Eigen::VectorXd Eigen_sol;
     
-
-    vector<double> multiplyMatrixVector(const vector<vector<double>>& matrix, const vector<double>& vec) {
-
-        vector<double> result(matrix.size(), 0.0);
-
-        for (size_t i = 0; i < matrix.size(); ++i) {
-            for (size_t j = 0; j < vec.size(); ++j) {
-                result[i] += matrix[i][j] * vec[j];
-            }
-        }
-        return result;
-    }
-
-
 
     // Function to convert Matrix to a matrixXd
     Eigen::MatrixXd convert_stdMatrix_To_MatrixXd(const vector<vector<double>>& matrix_xd) {
@@ -363,7 +306,7 @@ class interpolate {
 public:
     interpolate(SetGrid& grid) : grid_inst(grid), N(grid.size) {}
 
-    //chebyshev interpolation: interpolation of a function (whose values on the grid points from 0 to 1 are known) using chebyshev expansion
+    //chebyshev interpolation
     double cheby(const vector<double>& f, double y) {
         double var = 0.0;
         for (size_t j = 1; j <= N; ++j) {
@@ -374,49 +317,9 @@ public:
     }
 
 
-    // interpolation function
-    double polynomial(const std::vector<double>& x, const std::vector<double>& y, double x_val, int order) {
-        switch (order) {
-        case 0: // Nearest neighbor
-            return nearest_neighbor_interpolation(x, y, x_val);
-        case 1: // Linear interpolation 
-            return linear_interpolation(x, y, x_val);
-        case 2: // Quadratic
-        case 3: // Cubic
-        case 4: // Quartic
-            return polynomial_interpolation(x, y, x_val, order);
-
-        }
-    }
-
-
-    double trapezoidal_integral(const std::vector<double>& x, const std::vector<double>& y, double start, double end, int order,
-        size_t n_steps) {
-        double step_size = (end - start) / n_steps;
-        double integral = 0.0;
-
-
-        for (size_t i = 0; i < n_steps; ++i) {
-            double x_left = start + i * step_size;
-            double x_right = start + (i + 1) * step_size;
-            double y_left = polynomial(x, y, x_left, order);
-            double y_right = polynomial(x, y, x_right, order);
-            integral += 0.5 * (y_left + y_right) * step_size;
-        }
-
-        return integral;
-    }
-
 private:
     SetGrid& grid_inst;
     size_t N;
-
-    //function to calculate the chebyshev polynomials of first kind, which are defined on [-1,1]
-    //double cheby_polynomial_1_kind(int j, double y) {
-    //    return cos(j * acos(y));
-    //}
-
-    //function to calculate the chebyshev polynomials of second kind, which are defined on [-1,1]
 
     double cheby_polynomial_2_kind(size_t j, double y) {
         if (j == 0) return 1;
@@ -436,7 +339,7 @@ private:
     }
 
     //function to calculate the cardinal functions for the chebyshev expansion for [-1,1]. 
-    double cardinal_fct_oneToMinusOne(size_t j, double y) {
+    double cardinal_fct_oneToMinusOne(size_t j, double y) {//j is for the order of the cardinal fct
         vector<double> z = grid_inst.z;
 
         if (y == z[j - 1]) return 1.0;
@@ -447,84 +350,9 @@ private:
 
 
     //function to calculate the  cardinal functions for the chebyshev expansion for [0,1].
-    double cardinal_fct(size_t j, double y) {
+    double cardinal_fct(size_t j, double y) {//j is for the order of the cardinal fct
         return cardinal_fct_oneToMinusOne(j, 2.0 * y - 1.0);
     }
-
-    //for the time interpolation
-    double nearest_neighbor_interpolation(const std::vector<double>& x, const std::vector<double>& y, double x_val) {
-        auto it = std::lower_bound(x.begin(), x.end(), x_val);
-        if (it == x.begin()) return y.front();
-        if (it == x.end()) return y.back();
-        auto index = std::distance(x.begin(), it);
-        if (x_val - x[index - 1] < x[index] - x_val) {
-            return y[index - 1];
-        }
-        else {
-            return y[index];
-        }
-    }
-
-
-    double linear_interpolation(const std::vector<double>& x, const std::vector<double>& y, double x_val) {
-
-        if (x_val < x.front()) {
-            double x0 = x[0], x1 = x[1];
-            double y0 = y[0], y1 = y[1];
-            return y0 + (y1 - y0) * (x_val - x0) / (x1 - x0);
-        }
-
-        if (x_val > x.back()) {
-            size_t n = x.size();
-            double x0 = x[n - 2], x1 = x[n - 1];
-            double y0 = y[n - 2], y1 = y[n - 1];
-            return y0 + (y1 - y0) * (x_val - x0) / (x1 - x0);
-        }
-
-
-        auto it = std::lower_bound(x.begin(), x.end(), x_val);
-        auto index = std::distance(x.begin(), it);
-        double x0 = x[index - 1], x1 = x[index];
-        double y0 = y[index - 1], y1 = y[index];
-        return y0 + (y1 - y0) * (x_val - x0) / (x1 - x0);
-    }
-
-    // Polynomial interpolation for orders 2, 3, and 4
-    double polynomial_interpolation(const std::vector<double>& x, const std::vector<double>& y, double x_val, int order) {
-        int n = static_cast<int>(x.size());
-
-        int subset_size = std::min(order + 1, n);
-
-
-        int start_idx = 0;
-        auto it = std::lower_bound(x.begin(), x.end(), x_val);
-        int index = static_cast<int>(std::distance(x.begin(), it));
-
-
-        if (index >= subset_size / 2 && index + subset_size / 2 < n) {
-            start_idx = index - subset_size / 2;
-        }
-        else if (index + subset_size / 2 >= n) {
-            start_idx = n - subset_size;
-        }
-
-        std::vector<double> x_sub(x.begin() + start_idx, x.begin() + start_idx + subset_size);
-        std::vector<double> y_sub(y.begin() + start_idx, y.begin() + start_idx + subset_size);
-
-
-        double result = 0.0;
-        for (size_t i = 0; i < static_cast<size_t>(subset_size); ++i) {
-            double term = y_sub[i];
-            for (size_t j = 0; j < static_cast<size_t>(subset_size); ++j) {
-                if (i != j) {
-                    term *= (x_val - x_sub[j]) / (x_sub[i] - x_sub[j]);
-                }
-            }
-            result += term;
-        }
-        return result;
-    }
-
 
 };
 
@@ -534,30 +362,30 @@ private:
 
 class find_horizon {
 public:
-    
 
     double run(vector<vector<vector<double>>>& vals, const double& ksi, double& initial_guess, double& tolerance, int& max_iterations) {
         double x_n = initial_guess;
 
         for (size_t i = 0; i < static_cast<size_t>(max_iterations); ++i) {
-            double f_xn = (1.0 / (2.0 * pow(x_n, 2))) + pow(x_n, 2) * interp.cheby(vals[2][0], x_n) + (ksi / x_n) +
+            double f_xn = (1.0 / (2.0 * pow(x_n, 2))) + pow(x_n, 2) * Interp.cheby(vals[2][0], x_n) + (ksi / x_n) +
                 0.5 * pow(ksi, 2);
-            double df_xn = -(1.0 / pow(x_n, 3)) + 2.0 * x_n * interp.cheby(vals[2][0], x_n) - (ksi / pow(x_n, 2)) +
-                pow(x_n, 2) * interp.cheby(vals[2][1], x_n);
+            double df_xn = -(1.0 / pow(x_n, 3)) + 2.0 * x_n * Interp.cheby(vals[2][0], x_n) - (ksi / pow(x_n, 2)) +
+                pow(x_n, 2) * Interp.cheby(vals[2][1], x_n);
 
-            if (abs(f_xn) < tolerance) break;
+            if (abs(f_xn) < tolerance) {return x_n;}
             x_n = x_n - (f_xn / df_xn);
         }
+        std::cerr << "While looking for horizon position, max number of iterations is reached." << std::endl;//unnecessary
         return x_n;
     }
 
 
-    find_horizon(SetGrid& grid) : interp(grid) {}
+    find_horizon(SetGrid& grid) : Interp(grid) {}
 
 
 private:
 
-    interpolate interp;
+    interpolate Interp;
 
 };
 
@@ -566,35 +394,274 @@ private:
 class radial_shift {
 
 public:
-    void run(double& uh, double desired_uh, double& ksi) {
-        ksi += -(1.0 / (desired_uh)) + (1.0 / uh);
+    
+    //updates ksi and returns the change in ksi.
+    double run(double& uh, double& desired_uh, double& ksi) {
+        double change_in_Ksi = -(1.0 / (desired_uh)) + (1.0 / uh);
+        ksi += change_in_Ksi;
+        return change_in_Ksi;
     }
+};
+
+/////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////
+class initialize {
+public:
+
+    initialize(SetGrid& grid, vector<vector<vector<double>>>& vals, double Beta, double Omega, double U0, double& ksi) : grid_inst(grid),
+         solver(grid), horizon_finder(grid), beta(Beta), omega(Omega), u0(U0) {
+
+        for (size_t i = 0; i < grid_inst.size; ++i) {
+            vals[0][0][i] = aux_Bs0(ksi, grid_inst.u[i]);
+        }
+
+        vals[0][1] = multiplyMatrixVector(grid_inst.D, vals[0][0]);
+        vals[0][2] = multiplyMatrixVector(grid_inst.D2, vals[0][0]);
+    }
+
+    void fix_horizon(vector<vector<vector<double>>>& vals, double& ksi, double& a4, double& uh, double& uh_desired,
+        double& precision, double& tolerance, int& max_iterations) {
+        int count = 0;
+        while (count == 0 || abs(uh - uh_desired) > precision) {
+            count += 1;
+            // Run the solver
+            solver.run(2, vals, ksi, a4);
+
+            //Now find horizon
+            uh = horizon_finder.run(vals, ksi, uh, tolerance, max_iterations);
+            
+            if (abs(uh - uh_desired) > precision) {
+                shift.run(uh, uh_desired, ksi);
+                update(vals, ksi);
+            }
+
+        }
+
+        cout << count - 1 << " iterative radial shilfts executed at first time slice. Now uh= " << uh << endl;
+    }
+
+ 
+private:
+    double beta;
+    double omega;
+    double u0;
+    SetGrid& grid_inst;
+    solve solver;
+    find_horizon horizon_finder;
+    radial_shift shift;
+   
+
+    //define the function Bs at the first time slice for ksi=0
+    double Bs0(double uu) {
+        return beta * exp(-pow((uu - u0), 2) / pow(omega, 2));
+    }
+
+    double aux_Bs0(const double& ksi, double uu) {
+        return pow(1.0 / (1 + uu * ksi), 4) * Bs0(uu / (1.0 + ksi * uu));
+    }
+
+    void update(vector<vector<vector<double>>>& vals, double& ksi) {
+        //transform Bs to new coordinate system
+        for (size_t i = 0; i < grid_inst.size; ++i) {
+            vals[0][0][i] = aux_Bs0(ksi, grid_inst.u[i]);
+        }
+        vals[0][1] = multiplyMatrixVector(grid_inst.D, vals[0][0]);
+        vals[0][2] = multiplyMatrixVector(grid_inst.D2, vals[0][0]);
+
+    }
+
 };
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+class rk4_Bs_ksi_step {
+public:
 
-class Wilke_Routine {
+    rk4_Bs_ksi_step(SetGrid& grid):grid_inst(grid), interp(grid){}
+
+    //run returns Bs and ksi at next time slice
+     pair<vector<double>, double> run(vector<vector<vector<double>>>& vals, double& ksi, double& a4, solve& solver, double& uh, double dt) {
+
+         vector<double> Bs_new(grid_inst.size);
+         double ksi_new;
+
+        //get the k stages for Bs and ksi
+         pair<vector<vector<double>>, vector<double>> k = compute_k(vals, ksi, a4, solver, uh, dt);
+
+        for (size_t j = 0; j < grid_inst.size; ++j) {
+            Bs_new[j] = vals[0][0][j] +  (dt / 6.0) * ( k.first[0][j] + 2.0 * k.first[1][j] + 2.0 * k.first[2][j] + k.first[3][j]);
+        }
+        ksi_new = ksi + (dt / 6.0) * (k.second[0] + 2.0 * k.second[1] + 2.0 * k.second[2] + k.second[3]);
+
+        return std::make_pair(Bs_new, ksi_new);
+    }
+
 private:
-    vector<double> dts;
+    SetGrid& grid_inst;
+    interpolate interp;
+   
+    double dt_ksi( vector<vector<vector<double>>>& vals, double& ksi, double& uh){
+        return (2.0 + 2.0 * pow(uh, 4) * interp.cheby(vals[4][0], uh) + pow(uh, 8) * pow(interp.cheby(vals[3][0], uh), 2) +
+            4.0 * uh * ksi + 2.0 * pow(uh, 2) * pow(ksi, 2)) / (4.0 * pow(uh, 2)); // dt_ksi is time derivative of ksi.
+    }
+
+    
+
+    vector<double> dt_Bs(vector<vector<vector<double>>>& vals, double& ksi, double& dt_Ksi){
+        vector<double> D(grid_inst.size);
+
+        D[0] = 0.5 * (8.0 * vals[0][0][0] * ksi + 2.0 * vals[3][1][0] + 5.0 * vals[0][1][0]);
+        for (size_t i = 1; i < grid_inst.size; ++i) {
+            D[i] = (1.0 / (2.0 * grid_inst.u[i])) * (2.0 * vals[3][0][i] + (1.0 + pow(grid_inst.u[i], 4) * vals[4][0][i]
+                + 2.0 * grid_inst.u[i] * ksi + pow(grid_inst.u[i], 2) * pow(ksi, 2) -
+                2.0 * pow(grid_inst.u[i], 2) * dt_Ksi) * (4.0 * vals[0][0][i] + grid_inst.u[i] * vals[0][1][i]));
+        }
+        return D;
+    }
+
+
+    pair<vector<vector<double>>, vector<double>> compute_k(vector<vector<vector<double>>>& vals, double& ksi, double& a4, solve& solver, double& uh, double&dt) {
+        /*The pair contains a matrix for k_Bs and a vector for k_ksi */
+        vector<double> k_ksi(4);
+        vector<vector<double>> k_Bs(4, vector<double>(grid_inst.size ));
+        
+        //compute k1
+        k_ksi[0] = dt_ksi(vals, ksi, uh);
+        k_Bs[0] = dt_Bs(vals, ksi, k_ksi[0]);
+        
+        //compute k2
+        double  ksi_temp =ksi + 0.5 * dt * k_ksi[0];
+        vector<vector<vector<double>>> vals_temp = vals;
+        for (size_t i=0; i<grid_inst.size; ++i){
+            vals_temp[0][0][i] +=  dt * 0.5 * k_Bs[0][i];
+        }
+        vals_temp[0][1] = multiplyMatrixVector(grid_inst.D, vals_temp[0][0]);
+        vals_temp[0][2] = multiplyMatrixVector(grid_inst.D2, vals_temp[0][0]);
+        solver.run(4, vals_temp, ksi_temp, a4);
+
+        k_ksi[1] = dt_ksi(vals_temp, ksi_temp, uh);
+        k_Bs[1] = dt_Bs(vals_temp, ksi_temp, k_ksi[1]);
+
+        //compute k3
+        ksi_temp = ksi + 0.5 * dt * k_ksi[1];
+        vals_temp = vals;
+        for (size_t i=0; i < grid_inst.size; ++i) {
+            vals_temp[0][0][i] += 0.5 * dt * k_Bs[1][i];
+        }
+        vals_temp[0][1] = multiplyMatrixVector(grid_inst.D, vals_temp[0][0]);
+        vals_temp[0][2] = multiplyMatrixVector(grid_inst.D2, vals_temp[0][0]);
+        solver.run(4, vals_temp, ksi_temp, a4);
+        
+        k_ksi[2] = dt_ksi(vals_temp, ksi_temp, uh); 
+        k_Bs[2] = dt_Bs(vals_temp, ksi_temp, k_ksi[2]);
+
+        //compute k4
+        ksi_temp = ksi + dt * k_ksi[2];
+        vals_temp = vals;
+        for (size_t i=0; i < grid_inst.size; ++i) {
+            vals_temp[0][0][i] += dt * k_Bs[2][i];
+        }
+        vals_temp[0][1] = multiplyMatrixVector(grid_inst.D, vals_temp[0][0]);
+        vals_temp[0][2] = multiplyMatrixVector(grid_inst.D2, vals_temp[0][0]);
+        solver.run(4, vals_temp, ksi_temp, a4);
+
+        k_ksi[3] = dt_ksi(vals_temp, ksi_temp, uh);
+        k_Bs[3] = dt_Bs(vals_temp, ksi_temp, k_ksi[3]);
+
+
+        return std::make_pair(k_Bs, k_ksi);
+
+    }
+
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+class adaptive_rk4_Bs_ksi {
+public:
+    adaptive_rk4_Bs_ksi(SetGrid& grid): RK4_Bs_ksi_step(grid) {}
+    void run(SetGrid& grid, vector<vector<vector<double>>>& vals, double& ksi, double& a4, solve& solver, double& uh, double& t, double& t_f, double& dt,
+        double& precision) {
+
+        // Perform a full RK4 step for Bs and ksi
+        pair<vector<double>, double> result_full_step/*containes a pair of Bs_new and ksi_new */ = RK4_Bs_ksi_step.run(vals, ksi, a4, solver, uh, dt);
+       
+
+        // Perform two 1/2-step RK4 steps for Bs and ksi
+        pair<vector<double>, double> result_half_1 = RK4_Bs_ksi_step.run(vals, ksi,a4, solver,  uh, dt/2.0);
+
+        vals_half_1 = vals;
+        for (size_t i = 0; i < grid.size; ++i) {
+            vals_half_1[0][0][i] = result_half_1.first[i];
+        }
+        vals_half_1[0][1] = multiplyMatrixVector(grid.D, vals_half_1[0][0]);
+        vals_half_1[0][2] = multiplyMatrixVector(grid.D2, vals_half_1[0][0]);
+        solver.run(4, vals_half_1, result_half_1.second, a4);
+
+
+        pair<vector<double>, double> result_half_2 = RK4_Bs_ksi_step.run(vals_half_1, result_half_1.second, a4, solver, uh,  dt / 2.0);
+
+        
+        //calculate next time step  
+        dt = dt * pow((pow(10.0, -precision) / compute_error(result_full_step, result_half_2)  ), 1.0 / 4.0);
+        
+        // Prevent the timestep from exceeding t_f
+        if (t + dt >= t_f) {
+            dt = t_f - t;
+        }
+        
+        //update Bs and ksi with their values on the next time slice 
+        vals[0][0] = result_full_step.first;
+        ksi = result_full_step.second;
+
+        t += dt;
+    
+    
+    }
+
+
+private:
+    rk4_Bs_ksi_step RK4_Bs_ksi_step;
+    vector<vector<vector<double>>> vals_half_1;
+    
+
+    double compute_error(pair<vector<double>, double>& result_1, pair<vector<double>, double>& result_2) {
+        double err = 0.0;
+        for (size_t i = 0; i < result_1.first.size(); ++i) {
+            err = std::max(err, std::abs(result_1.first[i] - result_2.first[i]));
+        }
+        err = std::max(err, std::abs(result_1.second - result_2.second));
+
+        return err;
+    }
+
+
+};
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+class Num_Routine {
+private:
+    
     int number_slices;
-    int orderInterp;
-    double tolerance ;
-    int max_iterations ;
-    double tt;
+    double t;
     double deltaP_over_Peq;
-    double dt_ksi;
-    vector<double> last_dtBs;
 
     interpolate interp;
-    
+    adaptive_rk4_Bs_ksi adaptive_RK4_Bs_ksi;
+    radial_shift shift;
+    solve solver;
+    find_horizon horizon_finder;
+    double change_in_ksi;
+    vector<double> aux_vector;
 
 public:
     vector<double> horizonlist;
     vector<double> timelist;
-    vector<double> timelist_Bs;
-   
     vector<double> deltaP_over_Peq_list;
 
     vector<vector<double>> Ss_list;//contains Ss at all times
@@ -602,50 +669,46 @@ public:
     vector<vector<double>> Bdots_list;
     vector<vector<double>> As_list;
     vector<vector<double>> Bs_list;
-    vector<vector<double>> dtBs_list;//contains time derivative of Bs at all times.
-
+    vector<vector<double>> B_over_u3_list;
     vector<double> ksi_list;
-    vector<double> dt_ksi_list;//contains time derivative of ksi at all times.
+  
 
-
-    Wilke_Routine(SetGrid& grid, double&t_0, double& t_f, double& dt, vector<vector<vector<double>>>& vals, double& ksi, double& a4, 
-        solve& solver, find_horizon& horizon_finder, double& uh, double& uh_initial): tt(t_0), interp(grid), orderInterp(5),
-        number_slices(static_cast<int>(std::ceil((t_f - t_0) / dt))), tolerance(1e-7), max_iterations(2000), last_dtBs(grid.size) {
-
-        //create table dts
-        for (int i = -8; i <= -1; ++i) {
-            dts.push_back(pow(10.0, i / 2.0));
-        }
-
-        double sum_first_part = 0.0;
-        for (size_t i = 0; i <= 7; ++i) {
-            sum_first_part += dts[i];
-        }
-        dts.push_back(1.0 - sum_first_part);
-        dts.push_back(1.0);
-
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    Num_Routine(SetGrid& grid, double&t_0, double& t_f, double& dt, vector<vector<vector<double>>>& vals, double& ksi, double& a4,
+        double& uh,  initialize& Initialize,  double uh_desired,
+        double& precision/* for adaptive RK4*/ , double& tolerance/*for horizon finder*/, int& max_iterations/*for horizon finder*/):
+        t(t_0), interp(grid), number_slices(0),
+          adaptive_RK4_Bs_ksi(grid), solver(grid), horizon_finder(grid), aux_vector(grid.size), change_in_ksi(0.0){
         
-        std::cout << "number of time slices is: " << number_slices << endl;
-
-        for (size_t count = 1; count <= static_cast<size_t>(number_slices); ++count) {
-
-            if (count % 100 == 0) {
+        
+        while (t <= t_f){
+            number_slices += 1;
+            
+            if (number_slices % 100 == 0) {
                 solver.run(2, vals, ksi, a4);
-                
                 uh = horizon_finder.run(vals, ksi, uh, tolerance, max_iterations);
-                shift.run(uh, uh_initial, ksi);
+                
+
+                change_in_ksi=shift.run(uh, uh_desired, ksi);
             }
 
             solver.run(4, vals, ksi, a4);
             
             uh = horizon_finder.run(vals, ksi, uh, tolerance, max_iterations);
-            
+        
+           
             horizonlist.push_back(uh);
-            timelist.push_back(tt);
+            ksi_list.push_back(ksi);
+            timelist.push_back(t);
 
             Bs_list.push_back(vals[0][0]);
+            
+            vector<double> last_B_over_u3(grid.size);
+
+            // component-wise multiplication of 2 vectors
+            std::transform(grid.u.begin(), grid.u.end(), vals[0][0].begin(), last_B_over_u3.begin(),
+                [](double a, double b) { return a * b; });
+
+            B_over_u3_list.push_back(last_B_over_u3);
             Ss_list.push_back(vals[1][0]);
             Sdots_list.push_back(vals[2][0]);
             Bdots_list.push_back(vals[3][0]);
@@ -654,146 +717,19 @@ public:
 
             deltaP_over_Peq = (12.0 / pow(M_PI, 2)) * vals[0][0][0] / a4;
             deltaP_over_Peq_list.push_back(deltaP_over_Peq);
+            cout << "time slice: " << number_slices << " , t: " << t << " , dt: " << dt << " , deltaP_over_Peq: " << deltaP_over_Peq 
+                <<" , uh: "<< uh<<endl;
 
-            
-            
+            //calculates Bs and ksi at next time slice, finds the next timestep based on estimation of error and updates t
+            if (t < t_f) {
+                adaptive_RK4_Bs_ksi.run(grid, vals, ksi, a4, solver, uh, t, t_f, dt, precision);
 
-
-            dt_ksi = (2.0 + 2.0 * pow(uh, 4) * interp.cheby(vals[4][0], uh) + pow(uh, 8) * pow(interp.cheby(vals[3][0], uh), 2) +
-                4.0 * uh * ksi + 2.0 * pow(uh, 2) * pow(ksi, 2)) / (4.0 * pow(uh, 2)); // dt_ksi is time derivative of ksi.
-
-            dt_ksi_list.push_back(dt_ksi);
-
-
-           
-            last_dtBs[0] = 0.5 * (8.0 * vals[0][0][0] * ksi + 2.0 * vals[3][1][0]  + 5.0 * vals[0][1][0] );
-            for (size_t j = 1; j < grid.size; ++j) {
-                last_dtBs[j] = (1.0 / (2.0 * grid.u[j])) * (2.0 * vals[3][0][j]  + (1.0 + pow(grid.u[j], 4) * vals[4][0][j]
-                    + 2.0 * grid.u[j] * ksi + pow(grid.u[j], 2) * pow(ksi, 2) -
-                    2.0 * pow(grid.u[j], 2) * dt_ksi) * (4.0 * vals[0][0][j]  + grid.u[j] * vals[0][1][j] ));
+                vals[0][1] = multiplyMatrixVector(grid.D, vals[0][0]);
+                vals[0][2] = multiplyMatrixVector(grid.D2, vals[0][0]);
             }
-
-
-            dtBs_list.push_back(last_dtBs);
-
-            tt = tt + dt * dts[min(dts.size(), timelist.size()) - 1];
-
-            if (static_cast<int>(timelist.size()) > 5 &&
-                (timelist[timelist.size() - 6] - timelist[timelist.size() - 5]) -
-                (timelist[timelist.size() - 3] - timelist[timelist.size() - 2]) < 1e-12) {
-
-
-                //get Bs at next time slice
-                for (size_t k = 0; k < grid.size; ++k) {
-                    vals[0][0][k] += (dt / 720.0) * (1901.0 * dtBs_list[dtBs_list.size() - 1][k]
-                        - 2774.0 * dtBs_list[dtBs_list.size() - 2][k]
-                        + 2616.0 * dtBs_list[dtBs_list.size() - 3][k]
-                        - 1274.0 * dtBs_list[dtBs_list.size() - 4][k]
-                        + 251.0 * dtBs_list[dtBs_list.size() - 5][k]);
-                }
-
-
-
-                //get ksi at next time slice
-
-
-                ksi += (dt / 720.0) * (1901.0 * dt_ksi_list[dt_ksi_list.size() - 1]
-                    - 2774.0 * dt_ksi_list[dt_ksi_list.size() - 2]
-                    + 2616.0 * dt_ksi_list[dt_ksi_list.size() - 3]
-                    - 1274.0 * dt_ksi_list[dt_ksi_list.size() - 4]
-                    + 251.0 * dt_ksi_list[dt_ksi_list.size() - 5]);
-
-            }
-            else {
-
-
-                int InterpolationOrder_Bs_ksi = std::min(orderInterp - 1, static_cast<int>(dtBs_list.size()) - 1);
-
-                //get Bs at next time slice
-
-                for (size_t i = 0; i < grid.size; ++i) {
-
-                    vector<double> rel_time_list;
-                    vector<double> function_values;
-                    size_t mm = static_cast<size_t>(min(static_cast<int>(dtBs_list.size()), 6));
-
-                    for (size_t j = 1; j <= mm; ++j) {
-                        rel_time_list.push_back(timelist[timelist.size() - (mm - j + 1)]);
-                        function_values.push_back(dtBs_list[timelist.size() - (mm - j + 1)][i]);
-                    }
-
-
-
-
-                    vals[0][0][i] += interp.trapezoidal_integral(rel_time_list, function_values, timelist[timelist.size() - 1], tt, InterpolationOrder_Bs_ksi, 5000);
-
-
-
-
-                }
-
-
-                //get ksi at next time slice
-
-                vector<double> rel_time_list;
-                vector<double> function_values_dtksi;
-                size_t mm = static_cast<size_t>(min(static_cast<int>(dt_ksi_list.size()), 6));
-
-                for (size_t j = 1; j <= mm; ++j) {
-                    rel_time_list.push_back(timelist[timelist.size() - (mm - j + 1)]);
-                    function_values_dtksi.push_back(dt_ksi_list[timelist.size() - (mm - j + 1)]);
-                }
-
-
-
-
-                ksi += interp.trapezoidal_integral(rel_time_list, function_values_dtksi, timelist[timelist.size() - 1], tt, InterpolationOrder_Bs_ksi, 5000);
-
-
-            }
-
-            
-            vals[0][1] = multiplyMatrixVector(grid.D, vals[0][0]); 
-            vals[0][2] = multiplyMatrixVector(grid.D2, vals[0][0]);
-
-
-            ksi_list.push_back(ksi);
-            cout << "time slice " << count << endl;
-        }
-
-
-        for (size_t i = 0; i < timelist.size(); ++i) {
-            timelist_Bs.push_back(timelist[i]);
-        }
-
-        timelist_Bs.push_back(tt);
-
-        Bs_list.push_back(vals[0][0]);
-
-
-
-        double deltaP_over_Peq = (12.0 / pow(M_PI, 2)) * vals[0][0][0] / a4;
-        deltaP_over_Peq_list.push_back(deltaP_over_Peq);
-
+            else { break; }
+        }        
     }
-    
-
-private:
-    radial_shift shift;
-
-    vector<double> multiplyMatrixVector(const vector<vector<double>>& matrix, const vector<double>& vec) {
-
-        vector<double> result(matrix.size(), 0.0);
-
-        for (size_t i = 0; i < matrix.size(); ++i) {
-            for (size_t j = 0; j < vec.size(); ++j) {
-                result[i] += matrix[i][j] * vec[j];
-            }
-        }
-        return result;
-    }
-
-
 
 };
 
@@ -802,21 +738,23 @@ private:
 class print {
 
 public:
-    print(vector<vector<vector<double>>>& vals, Wilke_Routine& num_routine, SetGrid& grid, int Precision)
+    print(vector<vector<vector<double>>>& vals, Num_Routine& num_routine, SetGrid& grid, int Precision)
         : precision(Precision) {
 
         writeDeltaPOverPeq(num_routine);
-        writeMatrixToFile(num_routine.Bs_list, "Bs.dat", num_routine.timelist_Bs, grid.u);
+        writeMatrixToFile(num_routine.Bs_list, "Bs.dat", num_routine.timelist, grid.u);
         writeMatrixToFile(num_routine.Ss_list, "Ss.dat", num_routine.timelist, grid.u);
         writeMatrixToFile(num_routine.Sdots_list, "Sdots.dat", num_routine.timelist, grid.u);
         writeMatrixToFile(num_routine.Bdots_list, "Bdots.dat", num_routine.timelist, grid.u);
         writeMatrixToFile(num_routine.As_list, "As.dat", num_routine.timelist, grid.u);
+        writeMatrixToFile(num_routine.B_over_u3_list, "B_over_u3.dat", num_routine.timelist, grid.u);
+
     }
 
 private:
     int precision;
 
-    void writeDeltaPOverPeq(Wilke_Routine& num_routine) {
+    void writeDeltaPOverPeq(Num_Routine& num_routine) {
         std::ofstream outFile("deltaP_over_Peq.dat");
         if (!outFile) {
             throw std::runtime_error("Unable to open deltaP_over_Peq.dat for writing!");
@@ -824,8 +762,8 @@ private:
         //set precision
         outFile << std::fixed << std::setprecision(precision);
         
-        for (size_t i = 0; i < num_routine.timelist_Bs.size(); ++i) {
-            outFile << num_routine.timelist_Bs[i] << " " << num_routine.deltaP_over_Peq_list[i] << endl;
+        for (size_t i = 0; i < num_routine.timelist.size(); ++i) {
+            outFile << num_routine.timelist[i] << " " << num_routine.deltaP_over_Peq_list[i] << endl;
         }
     }
 
@@ -851,97 +789,51 @@ private:
 
 int main() {
 
-    
     auto start = std::chrono::high_resolution_clock::now();
+    std::cout << std::fixed << std::setprecision(10);//delete me
 
-    double ksi;
-    
+    double ksi=0.0;
+    int number_grid_pts = 25;
 
-    SetGrid grid(40); // with number of collocation points
+    SetGrid grid(number_grid_pts); 
     vector<vector<vector<double>>> vals(5, vector<vector<double>>(3, vector<double>(grid.size)));
 
-    double a4 = -3.0; //initial energy density.
+    double a4 = -1.0; //is twice a4 in Chesler and Yaffe convention.  
 
-    /////////////////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////////////
-    // Bs at first time slice is defined as beta * exp(-pow((uu - u0), 2) / (2.0 * pow(omega, 2))). 
+    // Bs at first time slice is defined (for ksi=0) as beta * exp(-pow((uu - u0), 2) / pow(omega, 2) ). 
     // Choose now values of beta, omega then u0.  
-    initialize Initialize(grid, vals, 0.9, 0.05, 0.5, ksi);
+    initialize Initialize(grid, vals, 5.0, 0.15, 0.25, ksi);
 
 
-    solve solver(grid);   
-    solver.run(2, vals, ksi, a4);
-    
+    //fix horizon at some position uh_desired
+    double uh=1.0;//initial guess for position of apparent horizon
+    double uh_desired = 1.0;
+    double precision_fix_horizon=1e-5;//uh is fixed to uh_desired up to precision_fix_horizon
+    double tolerance = 1e-8;//for horizon finder
+    int max_iterations = 10000;//for horizon finder
 
-    //Now find horizon
-    double uh = 1.0;  
-    double tolerance = 1e-10;
-    int max_iterations = 10000;
+    Initialize.fix_horizon(vals, ksi, a4 , uh,  uh_desired, precision_fix_horizon, tolerance, max_iterations);
 
-    find_horizon horizon_finder(grid);
-    uh = horizon_finder.run(vals, ksi, uh, tolerance, max_iterations);
-
-    double uh_initial = uh;
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     double t_0 = 0.0; // Initial time
-    double dt = 1.0 / 2000.0; // Time step
-    double t_f = 3.0; // Final time
+    double dt = 1 / (6.0 * pow(number_grid_pts, 2));  // Time step
+    double t_f = 4.0; // Final time
+    double precision_RK4 = 7;//adjust timestep to achieve a relative precision of 10^−precision_RK4
 
-    
-    Wilke_Routine  num_routine(grid, t_0, t_f, dt, vals, ksi, a4, solver, horizon_finder, uh, uh_initial);
+    Num_Routine num_routine(grid, t_0, t_f, dt, vals, ksi, a4,  uh, Initialize, uh_desired, precision_RK4, tolerance, max_iterations);
 
     auto end_numerics = std::chrono::high_resolution_clock::now();
-
 
     std::chrono::duration<double> duration_numerics = end_numerics - start;
 
     
-
-   // std::cout << "Ss(u) at the last time slice:" << endl;
-    //for (size_t i = 0; i < grid.size; ++i) {
-     //   std::cout << "Ss(" << grid.u[i] << ") = " << vals[1][0][i] << endl;
-    //}
-    //std::cout << endl;
-
-
-    //std::cout << "Sdots(u) at the last time slice:" << endl;
-    //for (size_t i = 0; i < grid.u.size(); ++i) {
-    //    std::cout << "Sdots(" << grid.u[i] << ") = " << vals[2][0][i] << endl;
-   // }
-    //std::cout << endl;
-
-    //std::cout << "Bdots(u) at the last time slice:" << endl;
-    //for (size_t i = 0; i < grid.u.size(); ++i) {
-    //    std::cout << "Bdots(" << grid.u[i] << ") = " << vals[3][0][i] << endl;
-    //}
-    //std::cout << endl;
-
-
-    //std::cout << "As(u) at the last time slice:" << endl;
-    //for (size_t i = 0; i < grid.u.size(); ++i) {
-    //    std::cout << "As(" << grid.u[i] << ") = " << vals[4][0][i] << endl;
-    //}
-    //std::cout << endl;
-
-
-    //std::cout << "Bs(u) at the last time slice:" << endl;
-    //for (size_t i = 0; i < grid.u.size(); ++i) {
-    //    std::cout << "Bs(" << grid.u[i] << ") = " << vals[0][0][i] << endl;
-    //}
-    //std::cout << endl;
-
-    
-    
     //Print out results in seperate dat files
     print Print(vals, num_routine, grid, 17);
 
-
-
-
-    //print horiozn list, if you want
-    std::ofstream outFile("horizon list.dat");
+    //print horiozn list
+/*    std::ofstream outFile("horizon list.dat");
     if (!outFile) {
         throw std::runtime_error("Unable to open horizon list.dat for writing!");
     }
@@ -952,7 +844,7 @@ int main() {
         outFile << num_routine.timelist[i] << " " << num_routine.horizonlist[i] << endl;
     }
 
-
+    */
 
     // Calculate the program execution time
     auto end = std::chrono::high_resolution_clock::now();
@@ -960,7 +852,6 @@ int main() {
 
     std::cout << "Numerical computations time, before printing out result to dat files: " << duration_numerics.count() << " seconds" << std::endl;
     std::cout << "Program execution time: " << duration.count() << " seconds" << std::endl;
-    
-    
+
     return 0;
 }
